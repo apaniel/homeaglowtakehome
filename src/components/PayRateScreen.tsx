@@ -1,37 +1,33 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { Container } from './Container';
-import { useOnboarding } from '../contexts/OnboardingContext';
 import { useUser } from '../contexts/UserContext';
 import { useRatePolicy } from '../hooks/useRatePolicy';
 import { RateInput } from './RateInput';
 import { ErrorDisplay } from '../ui/components/ErrorDisplay';
+import { usePayRate } from '~/contexts/PayRateContext';
 
 export const PayRateScreen = () => {
-  const { data, updateData, stepError, setStepError } = useOnboarding();
+  const { payRateState, updatePayRate, setError } = usePayRate();
   const { user } = useUser();
 
   const { policy, loading, error, refetch } = useRatePolicy(user?.state);
 
   // Initialize data when policy loads and no payRate is set
   useEffect(() => {
-    if (policy && !data.payRate) {
-      updateData({
-        payRate: policy.suggestedRate,
-      });
+    if (policy && !payRateState.payRate) {
+      updatePayRate(policy.suggestedRate);
     }
-  }, [policy, data.payRate, updateData]);
+  }, [policy, payRateState.payRate, updatePayRate]);
 
   const handleRateChange = (newRate: number) => {
-    updateData({
-      payRate: newRate,
-    });
+    updatePayRate(newRate);
 
     if (policy && (newRate < policy.minimumRate || newRate > policy.maximumRate)) {
-      setStepError(`Rate must be between ${policy.minimumRate} and ${policy.maximumRate}`);
+      setError(`Rate must be between ${policy.minimumRate} and ${policy.maximumRate}`);
       return;
     } else {
-      setStepError(null);
+      setError(null);
     }
   };
 
@@ -58,9 +54,7 @@ export const PayRateScreen = () => {
           <TouchableOpacity
             onPress={refetch}
             className="rounded-12px bg-button-fill-primary px-24 py-12">
-            <Text className="font-display text-lg font-semibold text-text-primary">
-              Try Again
-            </Text>
+            <Text className="font-display text-lg font-semibold text-text-primary">Try Again</Text>
           </TouchableOpacity>
         </View>
       </Container>
@@ -78,27 +72,25 @@ export const PayRateScreen = () => {
 
       <RateInput
         currency={user?.currency}
-        rate={data.payRate ?? 0}
+        rate={payRateState.payRate ?? 0}
         onRateChange={handleRateChange}
         minRate={1}
         maxRate={1000}
         recommendedRate={policy?.suggestedRate}
       />
 
-      {stepError && <ErrorDisplay error={stepError} />}
+      {payRateState.error && <ErrorDisplay error={payRateState.error} />}
 
       <View className="mb-32 flex-row items-center rounded-12px bg-fill-secondary px-16 py-12">
         <Text className="font-body text-lg text-text-primary">
           📅 We estimate you&apos;ll get{' '}
-          <Text className="font-semibold">{estimateJobs(data.payRate ?? 0)} jobs a week</Text>
+          <Text className="font-semibold">
+            {estimateJobs(payRateState.payRate ?? 0)} jobs a week
+          </Text>
         </Text>
       </View>
 
-      {policy?.hasCustomRatePolicy ? (
-        <CustomNewClientRate />
-      ) : (
-        <StandardNewClientRate />
-      )}
+      {policy?.hasCustomRatePolicy ? <CustomNewClientRate /> : <StandardNewClientRate />}
     </View>
   );
 };
@@ -117,11 +109,11 @@ function LoadingRate() {
 }
 
 function StandardNewClientRate(): React.ReactNode {
-  const { data } = useOnboarding();
+  const { payRateState } = usePayRate();
   // TODO: get from an api
   const marketingFee = 5;
 
-  const newClientRate = (data.payRate ?? 0) - marketingFee;
+  const newClientRate = (payRateState.payRate ?? 0) - marketingFee;
 
   return (
     <View className="mb-32">
@@ -133,7 +125,7 @@ function StandardNewClientRate(): React.ReactNode {
           ${newClientRate}/hr
         </Text>
       </View>
-      <Text className="font-body text-md leading-5 text-text-secondary">
+      <Text className="text-md font-body leading-5 text-text-secondary">
         A ${marketingFee}/hr marketing fee will apply to your rate for new clients.
       </Text>
     </View>
@@ -141,19 +133,17 @@ function StandardNewClientRate(): React.ReactNode {
 }
 
 function CustomNewClientRate(): React.ReactNode {
-  const { data, updateData } = useOnboarding();
+  const { payRateState, updateCustomNewClientRate } = usePayRate();
   const { user } = useUser();
-  const [customToggle, setCustomToggle] = useState(!!data.customNewClientRate);
+  const [customToggle, setCustomToggle] = useState(!!payRateState.customNewClientRate);
 
   const handleToggleCustomRate = () => {
     setCustomToggle(!customToggle);
-    updateData({
-      customNewClientRate: !customToggle ? data.payRate : null,
-    });
+    updateCustomNewClientRate(!customToggle ? payRateState.payRate : null);
   };
 
   const handleCustomRateChange = (rate: number) => {
-    updateData({ customNewClientRate: rate });
+    updateCustomNewClientRate(rate);
   };
 
   return (
@@ -165,7 +155,7 @@ function CustomNewClientRate(): React.ReactNode {
           <Text className="font-display text-lg font-semibold text-text-primary">
             Set new client rate
           </Text>
-          <Text className="font-body text-md text-text-secondary">
+          <Text className="text-md font-body text-text-secondary">
             Choose a custom hourly rate for new clients.
           </Text>
         </View>
@@ -174,7 +164,7 @@ function CustomNewClientRate(): React.ReactNode {
             customToggle ? 'bg-button-fill-primary' : 'bg-fill-secondary'
           }`}>
           <View
-            className={`shadow-raised h-20 w-20 rounded-round bg-surface-primary transition-transform duration-200 ${
+            className={`h-20 w-20 rounded-round bg-surface-primary shadow-raised transition-transform duration-200 ${
               customToggle ? 'translate-x-16' : 'translate-x-2'
             } mt-2`}
           />
@@ -183,10 +173,10 @@ function CustomNewClientRate(): React.ReactNode {
 
       {customToggle && (
         <View className="mb-16">
-          <Text className="mt-8 font-body text-md leading-5 text-text-secondary">New clients.</Text>
+          <Text className="text-md mt-8 font-body leading-5 text-text-secondary">New clients.</Text>
           <RateInput
             currency={user?.currency}
-            rate={data.customNewClientRate || data.payRate || 0}
+            rate={payRateState.customNewClientRate || payRateState.payRate || 0}
             onRateChange={handleCustomRateChange}
             minRate={1}
             maxRate={1000}

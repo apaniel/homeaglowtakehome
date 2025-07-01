@@ -1,13 +1,13 @@
 import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { Container } from './Container';
-import { useOnboarding } from '../contexts/OnboardingContext';
+import { useOnboarding, OnboardingProvider } from '../contexts/OnboardingContext';
 import { ProgressBar } from '../ui/components/ProgressBar';
 import { BackButton } from '../ui/components/BackButton';
 import { PayRateScreen } from './PayRateScreen';
 import { ErrorDisplay } from '../ui/components/ErrorDisplay';
 
-export const OnboardingFlow: React.FC = () => {
+const OnboardingFlowInner: React.FC = () => {
   const {
     currentStepId,
     currentStep,
@@ -58,6 +58,14 @@ export const OnboardingFlow: React.FC = () => {
         </View>
       </View>
     </Container>
+  );
+};
+
+export const OnboardingFlow: React.FC = () => {
+  return (
+    <OnboardingProvider>
+      <OnboardingFlowInner />
+    </OnboardingProvider>
   );
 };
 

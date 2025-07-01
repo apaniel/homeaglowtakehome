@@ -1,5 +1,4 @@
 import { UserProvider } from '~/contexts/UserContext';
-import { OnboardingProvider } from '~/contexts/OnboardingContext';
 import { StatusBar } from 'expo-status-bar';
 import { Figtree_400Regular } from '@expo-google-fonts/figtree/400Regular';
 import { Figtree_600SemiBold } from '@expo-google-fonts/figtree/600SemiBold';
@@ -28,9 +27,7 @@ export default function App() {
         />
       )}
       <UserProvider>
-        <OnboardingProvider>
-          <OnboardingFlow />
-        </OnboardingProvider>
+        <OnboardingFlow />
       </UserProvider>
       <StatusBar style="auto" />
     </>

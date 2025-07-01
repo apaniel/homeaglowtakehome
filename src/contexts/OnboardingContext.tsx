@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
-import { submitPayRate } from '~/services/payRateService';
+import React, { createContext, useContext, useCallback, ReactNode, useReducer } from 'react';
+import { usePayRate, PayRateProvider } from '~/contexts/PayRateContext';
 import { useUser } from './UserContext';
 
 export interface OnboardingStep {
@@ -7,26 +7,12 @@ export interface OnboardingStep {
   title: string;
 }
 
-// Having the data from all steps in the same object does not scale, it would be better to have a proper state manager or improve this with a reducer per step
-export interface OnboardingData {
-  payRate?: number;
-  customNewClientRate?: number | null;
-}
-
-interface OnboardingContextType {
-  currentStepId: string;
-  currentStep: number;
+type OnboardingContextType = OnboardingState & {
   totalSteps: number;
   goToNextStep: () => void;
   goToPreviousStep: () => void;
-  submitting: boolean;
   handleContinue: () => Promise<void>;
-  error: string | null;
-  updateData: (updates: Partial<OnboardingData>) => void;
-  data: OnboardingData;
-  stepError: string | null;
-  setStepError: (error: string | null) => void;
-}
+};
 
 const OnboardingContext = createContext<OnboardingContextType | undefined>(undefined);
 
@@ -44,89 +30,133 @@ interface OnboardingProviderProps {
   children: ReactNode;
 }
 
-export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children }) => {
-  const [currentStep, setCurrentStep] = useState<number>(1);
-  const [data, setData] = useState<OnboardingData>({});
+interface OnboardingState {
+  currentStep: number;
+  currentStepId: string;
+  submitting: boolean;
+  error: string | null;
+  stepError: string | null | undefined;
+}
+
+type OnboardingAction =
+  | { type: 'NEXT_STEP' }
+  | { type: 'PREVIOUS_STEP' }
+  | { type: 'SET_SUBMITTING'; payload: boolean }
+  | { type: 'SET_ERROR'; payload: string | null }
+  | { type: 'SET_STEP_ERROR'; payload: string | null };
+
+const reducer = (state: OnboardingState, action: OnboardingAction): OnboardingState => {
+  switch (action.type) {
+    case 'NEXT_STEP': {
+      const newCurrentStep =
+        state.currentStep < ONBOARDING_STEPS.length - 1 ? state.currentStep + 1 : state.currentStep;
+      return {
+        ...state,
+        currentStep: newCurrentStep,
+        currentStepId: ONBOARDING_STEPS[newCurrentStep].id,
+      };
+    }
+    case 'PREVIOUS_STEP': {
+      const newCurrentStep = state.currentStep > 0 ? state.currentStep - 1 : state.currentStep;
+      return {
+        ...state,
+        currentStep: newCurrentStep,
+        currentStepId: ONBOARDING_STEPS[newCurrentStep].id,
+      };
+    }
+    case 'SET_SUBMITTING': {
+      return {
+        ...state,
+        submitting: action.payload,
+      };
+    }
+    case 'SET_ERROR': {
+      return {
+        ...state,
+        error: action.payload,
+      };
+    }
+    default:
+      return state;
+  }
+};
+
+const initialState: OnboardingState = {
+  currentStep: 1,
+  currentStepId: ONBOARDING_STEPS[1].id,
+  submitting: false,
+  error: null,
+  stepError: null,
+};
+
+const OnboardingInner: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const [state, dispatch] = useReducer(reducer, initialState);
   const { user } = useUser();
-  const [submitting, setSubmitting] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
-  const [stepError, setStepError] = useState<string | null>(null);
+  const { payRateSubmit, payRateState } = usePayRate();
+
+  const stepError = payRateState.error;
 
   const goToNextStep = useCallback(() => {
-    setCurrentStep((prev) => {
-      if (prev < ONBOARDING_STEPS.length - 1) {
-        return prev + 1;
-      }
-      return prev;
-    });
+    dispatch({ type: 'NEXT_STEP' });
   }, []);
 
   const goToPreviousStep = useCallback(() => {
-    setCurrentStep((prev) => {
-      if (prev > 0) {
-        return prev - 1;
-      }
-      return prev;
-    });
-  }, []);
-
-  const updateData = React.useCallback((updates: Partial<OnboardingData>) => {
-    setError(null);
-    setData((prev) => ({ ...prev, ...updates }));
+    dispatch({ type: 'PREVIOUS_STEP' });
   }, []);
 
   const submitCurrentStep = useCallback(async () => {
-    switch (ONBOARDING_STEPS[currentStep].id) {
-      case 'pay-rate':
-        await submitPayRate({
-          userId: user?.id,
-          rate: data.payRate,
-          customNewClientRate: data.customNewClientRate,
-          state: user?.state,
-        });
-        break;
-      default:
-        break;
+    const stepId = ONBOARDING_STEPS[state.currentStep].id;
+    if (!user) {
+      throw new Error('User not found');
     }
-  }, [currentStep, user?.id, user?.state, data.payRate, data.customNewClientRate]);
+
+    if (stepId === 'pay-rate') {
+      await payRateSubmit();
+    }
+  }, [state.currentStep, user, payRateSubmit]);
 
   const handleContinue = useCallback(async () => {
-    if (stepError || error) {
+    if (stepError || state.error) {
       return;
     }
 
-    setError(null);
-    setSubmitting(true);
+    dispatch({ type: 'SET_SUBMITTING', payload: true });
+
     try {
       await submitCurrentStep();
     } catch (error) {
-      setError((error as Error).message);
-      setSubmitting(false);
+      dispatch({ type: 'SET_ERROR', payload: (error as Error).message });
+      dispatch({ type: 'SET_SUBMITTING', payload: false });
       return;
     }
 
     setTimeout(() => {
-      setSubmitting(false);
-      goToNextStep();
+      dispatch({ type: 'SET_SUBMITTING', payload: false });
+      dispatch({ type: 'NEXT_STEP' });
     }, 1000);
-  }, [goToNextStep, submitCurrentStep, stepError, error]);
+  }, [submitCurrentStep, stepError, state.error]);
 
-  const value: OnboardingContextType = {
-    currentStepId: ONBOARDING_STEPS[currentStep].id,
-    currentStep: currentStep + 1,
-    totalSteps: ONBOARDING_STEPS.length,
-    goToNextStep,
-    goToPreviousStep,
-    data,
-    updateData,
-    submitting,
-    handleContinue,
-    error,
-    stepError,
-    setStepError,
-  };
+  const value: OnboardingContextType = React.useMemo(
+    () => ({
+      ...state,
+      totalSteps: ONBOARDING_STEPS.length,
+      goToNextStep,
+      goToPreviousStep,
+      handleContinue,
+      stepError,
+    }),
+    [state, handleContinue, goToNextStep, goToPreviousStep, stepError]
+  );
 
   return <OnboardingContext.Provider value={value}>{children}</OnboardingContext.Provider>;
+};
+
+export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children }) => {
+  return (
+    <PayRateProvider>
+      <OnboardingInner>{children}</OnboardingInner>
+    </PayRateProvider>
+  );
 };
 
 export const useOnboarding = (): OnboardingContextType => {
