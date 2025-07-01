@@ -18,6 +18,7 @@ const OnboardingFlowInner: React.FC = () => {
     error,
     stepError,
   } = useOnboarding();
+  
   const showBackButton = currentStep !== 1;
 
   return (

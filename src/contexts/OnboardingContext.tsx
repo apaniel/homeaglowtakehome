@@ -31,6 +31,7 @@ interface OnboardingProviderProps {
 }
 
 interface OnboardingState {
+  currentStepIndex: number;
   currentStep: number;
   currentStepId: string;
   submitting: boolean;
@@ -48,20 +49,22 @@ type OnboardingAction =
 const reducer = (state: OnboardingState, action: OnboardingAction): OnboardingState => {
   switch (action.type) {
     case 'NEXT_STEP': {
-      const newCurrentStep =
-        state.currentStep < ONBOARDING_STEPS.length - 1 ? state.currentStep + 1 : state.currentStep;
+      const newCurrentStepIndex =
+        state.currentStepIndex < ONBOARDING_STEPS.length - 1 ? state.currentStepIndex + 1 : state.currentStepIndex;
       return {
         ...state,
-        currentStep: newCurrentStep,
-        currentStepId: ONBOARDING_STEPS[newCurrentStep].id,
+        currentStepIndex: newCurrentStepIndex,
+        currentStep: newCurrentStepIndex + 1,
+        currentStepId: ONBOARDING_STEPS[newCurrentStepIndex].id,
       };
     }
     case 'PREVIOUS_STEP': {
-      const newCurrentStep = state.currentStep > 0 ? state.currentStep - 1 : state.currentStep;
+      const newCurrentStepIndex = state.currentStepIndex > 0 ? state.currentStepIndex - 1 : state.currentStepIndex;
       return {
         ...state,
-        currentStep: newCurrentStep,
-        currentStepId: ONBOARDING_STEPS[newCurrentStep].id,
+        currentStepIndex: newCurrentStepIndex,
+        currentStep: newCurrentStepIndex + 1,
+        currentStepId: ONBOARDING_STEPS[newCurrentStepIndex].id,
       };
     }
     case 'SET_SUBMITTING': {
@@ -82,7 +85,8 @@ const reducer = (state: OnboardingState, action: OnboardingAction): OnboardingSt
 };
 
 const initialState: OnboardingState = {
-  currentStep: 1,
+  currentStepIndex: 1,
+  currentStep: 2,
   currentStepId: ONBOARDING_STEPS[1].id,
   submitting: false,
   error: null,
@@ -105,7 +109,7 @@ const OnboardingInner: React.FC<{ children: ReactNode }> = ({ children }) => {
   }, []);
 
   const submitCurrentStep = useCallback(async () => {
-    const stepId = ONBOARDING_STEPS[state.currentStep].id;
+    const stepId = ONBOARDING_STEPS[state.currentStepIndex].id;
     if (!user) {
       throw new Error('User not found');
     }
@@ -113,7 +117,7 @@ const OnboardingInner: React.FC<{ children: ReactNode }> = ({ children }) => {
     if (stepId === 'pay-rate') {
       await payRateSubmit();
     }
-  }, [state.currentStep, user, payRateSubmit]);
+  }, [state.currentStepIndex, user, payRateSubmit]);
 
   const handleContinue = useCallback(async () => {
     if (stepError || state.error) {
