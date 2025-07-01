@@ -98,13 +98,18 @@ const OnboardingInner: React.FC<{ children: ReactNode }> = ({ children }) => {
   const { user } = useUser();
   const { payRateSubmit, payRateState } = usePayRate();
 
-  const stepError = payRateState.error;
+  const errorMap: Record<string, string | null | undefined> = {
+    'pay-rate': payRateState.error,
+  };
+
+  const stepError = errorMap[state.currentStepId];
 
   const goToNextStep = useCallback(() => {
     dispatch({ type: 'NEXT_STEP' });
   }, []);
 
   const goToPreviousStep = useCallback(() => {
+    dispatch({ type: 'SET_ERROR', payload: null });
     dispatch({ type: 'PREVIOUS_STEP' });
   }, []);
 
