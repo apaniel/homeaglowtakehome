@@ -82,11 +82,11 @@ export async function submitPayRate(submission: PayRateSubmission) {
     throw new Error('Custom rates are not available in your state');
   }
 
-  if (submission.customNewClientRate! < policy.minimumRate) {
+  if (!!submission.customNewClientRate && submission.customNewClientRate! < policy.minimumRate) {
     throw new Error(`New Client rate must be at least $${policy.minimumRate}/hour`);
   }
 
-  if (submission.customNewClientRate! > policy.maximumRate) {
+  if (!!submission.customNewClientRate && submission.customNewClientRate! > policy.maximumRate) {
     throw new Error(`New Client rate cannot exceed $${policy.maximumRate}/hour`);
   }
 

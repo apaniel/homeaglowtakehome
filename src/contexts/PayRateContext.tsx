@@ -7,7 +7,6 @@ export interface OnboardingStep {
   title: string;
 }
 
-// Having the data from all steps in the same object does not scale, it would be better to have a proper state manager or improve this with a reducer per step
 export interface PayRateData {
   payRate?: number;
   customNewClientRate?: number | null;
@@ -30,12 +29,14 @@ const reducer = (state: PayRateState, action: PayRateAction): PayRateState => {
       return {
         ...state,
         payRate: action.payload,
+        error: null,
       };
     }
     case 'SET_CUSTOM_NEW_CLIENT_RATE': {
       return {
         ...state,
         customNewClientRate: action.payload,
+        error: null,
       };
     }
     case 'SET_ERROR': {
