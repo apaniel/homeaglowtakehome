@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useCallback, ReactNode, useReducer } from 'react';
+import React, { createContext, useContext, useCallback, ReactNode, useReducer, useEffect } from 'react';
 import { usePayRate, PayRateProvider } from '~/contexts/PayRateContext';
 import { useUser } from './UserContext';
 
@@ -103,6 +103,10 @@ const OnboardingInner: React.FC<{ children: ReactNode }> = ({ children }) => {
   };
 
   const stepError = errorMap[state.currentStepId];
+
+  useEffect(() => {
+    dispatch({ type: 'SET_ERROR', payload: null });
+  }, [payRateState]);
 
   const goToNextStep = useCallback(() => {
     dispatch({ type: 'NEXT_STEP' });
